@@ -4,12 +4,12 @@ from .cache import key_path
 
 def _cache_read(path):
     if path.exists():
-        return pd.read_parquet(path)
+        return pd.read_csv(path, index_col=0, parse_dates=True)
     return None
 
 def _cache_write(df, path):
     path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_parquet(path)
+    df.to_csv(path)
 
 def fetch_prices_monthly(tickers, start=None, end=None):
     """
@@ -32,7 +32,7 @@ def fetch_prices_monthly(tickers, start=None, end=None):
         end=end,
         auto_adjust=True,
         progress=False,
-        interval="1d",
+        interval="1mo",
         group_by="column"
     )
 
@@ -93,8 +93,8 @@ def fetch_fred_series(series_id, start=None, end=None):
         return cached
 
     urls = [
-        f"https://fred.stlouisfed.org/series/{series_id}/downloaddata/{series_id}.csv",
-        f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}",
+        f"https://fred.stlouisfed.org/series/{series_id}/downloaddata/{series_id}.csv&frequency=m",
+        f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}&frequency=m",
     ]
 
     sess = requests.Session()

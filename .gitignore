@@ -22,3 +22,7 @@ pip-wheel-metadata/
 # Test / cache
 .pytest_cache/
 .cache/
+.venv/
+data_cache/
+__pycache__/
+*.ipynb_checkpoints/
