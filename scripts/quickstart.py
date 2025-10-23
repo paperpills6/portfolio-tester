@@ -16,7 +16,7 @@ def main():
     ])
 
     # 2) Configs
-    sim_cfg = SimConfig(horizon_months=30*12, n_sims=100, starting_balance=1_000_000.0)  # start with 100 sims
+    sim_cfg = SimConfig(horizon_months=30*12, n_sims=100, starting_balance=1_000_000)  # start with 100 sims
     sam_cfg = SamplerConfig(mode="block_years", block_years=5, seed=42)
 
     goals = [
