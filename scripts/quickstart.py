@@ -17,7 +17,7 @@ def main():
 
     # 2) Configs
     sim_cfg = SimConfig(horizon_months=30*12, n_sims=100, starting_balance=1_000_000)  # start with 100 sims
-    sam_cfg = SamplerConfig(mode="block_years", block_years=1, seed=42)
+    sam_cfg = SamplerConfig(mode="single_month", block_years=1, seed=42)
 
     goals = [
         # Withdraw $4,000/mo starting in 1 year, for 30 years, inflation-indexed (real)
@@ -52,15 +52,7 @@ def main():
     print(f"Max Drawdown median: {np.median(mdd_vals):.1%}")
     print("Percentiles (10/50/90) - End Balance:",
           [f"${v:,.0f}" for v in np.percentile(out['balances'][:,-1], [10,50,90])])
-    
-    prices_m = fetch_prices_monthly(tickers)
-    rets_m, infl_m, rf_m = prep_returns_and_macro(prices_m)
-    print("Data coverage check:")
-    print("  Monthly prices shape:", prices_m.shape)
-    print("  Monthly returns shape:", rets_m.shape)
-    print("  First/last dates:", rets_m.index.min(), "→", rets_m.index.max())
-    print("  Tickers:", list(rets_m.columns))
-    print("  Unique years of history:", len(set(rets_m.index.year)))
+
     
 
 

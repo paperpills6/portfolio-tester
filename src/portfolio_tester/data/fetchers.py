@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from .cache import key_path
+import yfinance as yf
 
 def _cache_read(path):
     if path.exists():
@@ -11,71 +12,49 @@ def _cache_write(df, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path)
 
+def log(msg: str):
+    print(f"[debug] {msg}")
+
 def fetch_prices_monthly(tickers, start=None, end=None):
-    """
-    Fetch daily (auto-adjusted) prices from yfinance and resample to monthly (M) last.
-    Returns a monthly price DataFrame with columns = tickers.
-    """
-    import pandas as pd
-    import yfinance as yf
-    key = "|".join(tickers) + f"|{start}|{end}"
-    path = key_path("prices_yf", key)
+    """Download daily auto-adjusted prices from Yahoo and resample to month-end."""
 
-    df = _cache_read(path)
-    if df is not None:
-        return df
-
-    # auto_adjust=True already includes dividends/splits -> use 'Close'
+    log(f"Downloading from Yahoo Finance: {tickers}")
     data = yf.download(
         tickers,
-        start=start,
-        end=end,
         auto_adjust=True,
         progress=False,
-        interval="1mo",
-        group_by="column"
+        interval="1d",
+        group_by="column",
+        period="max",
     )
 
-    # Normalize to a simple DataFrame with 1 column per ticker of closing prices
-    def _extract_close_frame(data, tickers):
-        # Multi-ticker usually returns a MultiIndex DataFrame
+    def extract_close_frame(data, tickers):
+        import pandas as pd
         if isinstance(data, pd.DataFrame) and isinstance(data.columns, pd.MultiIndex):
-            lvl0 = data.columns.get_level_values(0)
-            # Try field-first layout: ('Close'/'Adj Close', ticker)
-            for fld in ("Close", "Adj Close"):
-                if fld in set(lvl0):
-                    return data[fld].copy()
-            # Try ticker-first layout: (ticker, 'Close'/'Adj Close')
+            lvl0 = set(data.columns.get_level_values(0))
+            if "Close" in lvl0:
+                return data["Close"].copy()
+            if "Adj Close" in lvl0:
+                return data["Adj Close"].copy()
             for fld in ("Close", "Adj Close"):
                 try:
                     return data.xs(fld, level=1, axis=1).copy()
                 except KeyError:
                     pass
-
-        # Single-ticker may return a regular DataFrame
-        if isinstance(data, pd.DataFrame) and not isinstance(data.columns, pd.MultiIndex):
+        if isinstance(data, pd.DataFrame):
             for fld in ("Close", "Adj Close"):
                 if fld in data.columns:
-                    # ensure the column is named as the ticker
                     return data[[fld]].rename(columns={fld: tickers[0]}).copy()
+        raise RuntimeError(f"Could not find Close/Adj Close columns. Columns={data.columns}")
 
-        # Single-ticker may return a Series
-        if hasattr(data, "name") and data.name in ("Close", "Adj Close"):
-            return data.to_frame(tickers[0]).copy()
-
-        raise ValueError("Could not find 'Close' or 'Adj Close' in yfinance output.")
-
-    px_daily = _extract_close_frame(data, tickers)
-
-    # Make sure columns are exactly in the input order (for consistency)
-    # Missing tickers (if any) will be dropped automatically by reindexing columns present
+    px_daily = extract_close_frame(data, tickers)
     present = [t for t in tickers if t in px_daily.columns]
+    if not present:
+        raise RuntimeError("None of the requested tickers returned price data.")
     px_daily = px_daily[present]
+    monthly = px_daily.resample("ME").last().dropna(how="all")
+    return monthly
  
-    # Resample to month-end and cache
-    df = px_daily.resample("ME").last().dropna(how="all")
-    _cache_write(df, path)
-    return df
 
 def fetch_fred_series(series_id, start=None, end=None):
     """
